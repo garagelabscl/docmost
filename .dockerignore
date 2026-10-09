@@ -4,3 +4,11 @@
 /data
 **/.env*
 **/.nx
+
+# Archivos de deploy y documentación: no forman parte de la imagen.
+/.github
+/appspec.yml
+/crowdin.yml
+/docker-compose.yml
+/README.md
+/scripts

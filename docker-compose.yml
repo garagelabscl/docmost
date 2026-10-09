@@ -1,38 +1,62 @@
 services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.web.address=:80'
+      - '--entrypoints.websecure.address=:443'
+      - '--certificatesresolvers.letsencrypt.acme.httpchallenge=true'
+      - '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web'
+      - '--certificatesresolvers.letsencrypt.acme.email=wilber@garagelabs.cl'
+      - '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json'
+      - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    restart: unless-stopped
   docmost:
     image: docmost/docmost:latest
     depends_on:
       - db
       - redis
-    environment:
-      APP_URL: 'http://localhost:3000'
-      APP_SECRET: 'REPLACE_WITH_LONG_SECRET'
-      DATABASE_URL: 'postgresql://docmost:STRONG_DB_PASSWORD@db:5432/docmost'
-      REDIS_URL: 'redis://redis:6379'
     ports:
-      - "3000:3000"
+      - '3000:3000'
     restart: unless-stopped
     volumes:
       - docmost:/app/data/storage
-
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.docmost.rule=Host(`docs.garagelabs.cl`)
+      - traefik.http.routers.docmost.entrypoints=websecure
+      - traefik.http.routers.docmost.tls.certresolver=letsencrypt
+      - traefik.http.services.docmost.loadbalancer.server.port=3000
+    env_file: .env
   db:
     image: postgres:18
     environment:
       POSTGRES_DB: docmost
       POSTGRES_USER: docmost
-      POSTGRES_PASSWORD: STRONG_DB_PASSWORD
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     restart: unless-stopped
     volumes:
       - db_data:/var/lib/postgresql
-
   redis:
     image: redis:8
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    command:
+      - redis-server
+      - '--appendonly'
+      - 'yes'
+      - '--maxmemory-policy'
+      - noeviction
     restart: unless-stopped
     volumes:
       - redis_data:/data
-
 volumes:
-  docmost:
-  db_data:
-  redis_data:
+  docmost: null
+  db_data: null
+  redis_data: null
+  letsencrypt: null
